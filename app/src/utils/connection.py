@@ -3,8 +3,18 @@ import os
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
 
+import logging
+import time
 
-def create_chat_model() -> ChatOpenAI:
+logger = logging.getLogger(__name__)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+)
+
+
+def Connection():
     environment_path = ".env"
     load_dotenv(dotenv_path=environment_path)
 
@@ -16,12 +26,10 @@ def create_chat_model() -> ChatOpenAI:
     if not model_name:
         raise ValueError("MODEL_NAME nao foi encontrado no arquivo .env")
 
+    logger.info("Model Name Enviroment Variable: %s", model_name)
     return ChatOpenAI(
         model=model_name,
         # api_key=api_key,
     )
 
-
-llm = create_chat_model()
-
-__all__ = ["ChatOpenAI"]
+__all__ = ["Connection"]
