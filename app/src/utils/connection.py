@@ -1,25 +1,14 @@
 import os
-from pathlib import Path
 
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-
-
-def load_credentials() -> dict[str, str]:
-    credentials_path = ".credentials"
-    credentials = {}
-
-    credentials = {"OPENAI_API_KEY": open(credentials_path, "r").read()}  # Create the file if it doesn't exist
-
-    print(credentials)
-    return credentials
 
 
 def create_chat_model() -> ChatOpenAI:
     environment_path = ".env"
     load_dotenv(dotenv_path=environment_path)
 
-    api_key = load_credentials().get("OPENAI_API_KEY")
+    api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY nao foi encontrada no arquivo .credentials")
 
@@ -29,7 +18,7 @@ def create_chat_model() -> ChatOpenAI:
 
     return ChatOpenAI(
         model=model_name,
-        api_key=api_key,
+        # api_key=api_key,
     )
 
 
