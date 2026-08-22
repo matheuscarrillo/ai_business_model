@@ -12,6 +12,6 @@ OPENAI_API_KEY=SITE OPENAI
 
 Em seguida, crie uma env e execute o comando abaixo, dentro da env:
 
-´´´bash
+```
 pip instal -e .
-´´´
+```
