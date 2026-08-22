@@ -1,9 +1,0 @@
-Metadata-Version: 2.1
-Name: ai-business-model
-Version: 0.1.0
-Summary: Modelo para atender melhor clientes de empresas de varejo
-Requires-Python: ==3.11.*
-Description-Content-Type: text/markdown
-
-# ai_business_model
-Developping model of business for better serve users
