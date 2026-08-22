@@ -2,7 +2,7 @@ from utils.connection import ChatOpenAI
 from utils.outputs import ResponseAgentOrch, ResponseAgentSpec, ResponseAgentConsolidator
 from agents.global_agent.prompt import SYSTEM_PROMPT_ORCH
 from langchain.messages import HumanMessage, AIMessage, SystemMessage
-from agents.graph.graph import run_agents
+from graph.graph import run_agents
 import warnings
 warnings.filterwarnings("ignore")
 
