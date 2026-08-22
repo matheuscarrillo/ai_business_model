@@ -1,0 +1,17 @@
+README.md
+pyproject.toml
+requirements.txt
+app/src/ai_business_model.egg-info/PKG-INFO
+app/src/ai_business_model.egg-info/SOURCES.txt
+app/src/ai_business_model.egg-info/dependency_links.txt
+app/src/ai_business_model.egg-info/requires.txt
+app/src/ai_business_model.egg-info/top_level.txt
+app/src/app.py
+app/src/agents/global_agent/kb.py
+app/src/agents/global_agent/nodes.py
+app/src/agents/global_agent/prompt.py
+app/src/agents/global_agent/tools.py
+app/src/ai_business_model.egg-info/SOURCES.txt
+app/src/utils/agent_state.py
+app/src/utils/config.py
+app/src/utils/connection.py
