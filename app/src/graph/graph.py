@@ -5,8 +5,8 @@ from agents.consolidator_agent.prompt import SYSTEM_PROMPT_CONS
 from langchain.messages import HumanMessage, AIMessage, SystemMessage
 from utils.agent_state import AgentState
 from utils.routes import AgentName, AgentNameList
-from utils.connection import Connection
-from langgraph.graph import StateGraph, MessagesState, START, END
+from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import InMemorySaver
 
 import logging
 import time
@@ -18,139 +18,164 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 )
 
+class AppAgent:
+    def __init__(self, llm):
+        self.dict_latency = {}
+        self.llm = llm
 
-llm = Connection()
+    def start_graph_config(self, state: AgentState):
 
-logger.info("ChatOpenAI initialized successfully.")
-logger.info("Model Name: %s", llm.model_name)
-logger.info("Starting the graph execution.")
+        logger.info("Starting graph configuration.")
 
-# NODES
-def agent_orchestrator(state:AgentState):
+        return {
+            "specialist_selected": [],
+            "latency": "__RESET__",
+            "reasoning": [],
+            "refining_question": "",
+            "response_agent_spec": "__RESET__",
+            "answers_final": "",
+        }
 
-    start = time.monotonic()
-    # Define the structured output for the orchestrator agent
-    structured_llm = llm.with_structured_output(ResponseAgentOrch)
+    # NODES
+    def agent_orchestrator(self, state:AgentState):
 
-    # Invoke the LLM with the system prompt and a sample user message
-    response = structured_llm.invoke([
-        SystemMessage(content=SYSTEM_PROMPT_ORCH),
-        HumanMessage(content=state.question_user),
-    ])
-    end = time.monotonic()
-
-    latency = int((end - start)*1000)
-
-    logger.info("Orchestrator sucessfully.")
-
-    return {"specialist_selected": response.selected_specialist,
-            "reasoning": response.reasoning,
-            "refining_question": response.refining_question,
-            "latency": [{"agent_orchestrator": latency}]}
-
-def create_specialist_agent(agent_name: AgentName):
-
-    def agent_specialist(state: AgentState):
-
-        nome_assunto = AgentName(agent_name).name
-
-        logger.info(
-            "Executando especialista: %s",
-            nome_assunto
-        )
+        logger.info("Executando orquestrador")
 
         start = time.monotonic()
+        # Define the structured output for the orchestrator agent
+        structured_llm = self.llm.with_structured_output(ResponseAgentOrch)
 
-        structured_llm = llm.with_structured_output(ResponseAgentSpec)
-
-        system_prompt = SYSTEM_PROMPT_SPEC.format(
-            nome_assunto=nome_assunto
-        )
-
+        # Invoke the LLM with the system prompt and a sample user message
         response = structured_llm.invoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=state.refining_question),
+            SystemMessage(content=SYSTEM_PROMPT_ORCH),
+            HumanMessage(content=state.question_user),
         ])
-
         end = time.monotonic()
 
         latency = int((end - start)*1000)
 
-        logger.info(f"Specialist {nome_assunto} successfully")
+        logger.info("Orchestrator sucessfully.")
 
-        return {"response_agent_spec" : [{
-            "agent_spec": agent_name.value, 
-            "answers_specialist": response.answers_specialist,
-            "kbs_selected": response.kbs_selected,
-        }], "latency": [{agent_name.value: latency}]}
+        self.dict_latency.update({"agent_orchestrator": latency})
 
-    return agent_specialist
+        return {"specialist_selected": response.selected_specialist,
+                "reasoning": response.reasoning,
+                "refining_question": response.refining_question,
+                "latency": [{"agent_orchestrator": latency}]}
 
-def agent_consolidator(state:AgentState):
+    def create_specialist_agent(self,agent_name: AgentName):
 
-    start = time.monotonic()
-    structured_llm = llm.with_structured_output(ResponseAgentConsolidator)
-    
-    response_agent_spec = state.response_agent_spec
-    
-    answers_specialist = [spec["answers_specialist"][0] for spec in response_agent_spec]
-    answers_specialist = "\n\n".join(answers_specialist)
-    response = structured_llm.invoke([
-        SystemMessage(content=SYSTEM_PROMPT_CONS),
-        HumanMessage(content=state.refining_question),
-        AIMessage(content=answers_specialist),
-    ])
-    logger.info("Consolidator successfully.")
+        def agent_specialist(state: AgentState):
 
-    end = time.monotonic()
-    latency = int((end - start)*1000)
+            nome_assunto = AgentName(agent_name).name
 
-    return {"answers_final": response.answers_final, "latency": [{"agent_consolidator": latency}]}
+            logger.info(
+                "Executando especialista: %s",
+                nome_assunto
+            )
 
-# EDGES
-def conditional_edge(state: AgentState) -> list[str]:
-    """Retorna dinamicamente os agentes selecionados pelo orquestrador."""
+            start = time.monotonic()
 
-    valid_agents = {agent.value for agent in AgentName}
+            structured_llm = self.llm.with_structured_output(ResponseAgentSpec)
 
-    return [
-        agent
-        for agent in state.specialist_selected
-        if agent in valid_agents
-    ]
+            system_prompt = SYSTEM_PROMPT_SPEC.format(
+                nome_assunto=nome_assunto
+            )
 
-def run_agents():
+            response = structured_llm.invoke([
+                                        SystemMessage(content=system_prompt),
+                                        *state.messages,
+                                    ])
 
-    graph = StateGraph(AgentState)
-    graph.add_node("agent_orchestrator", agent_orchestrator)
+            end = time.monotonic()
 
-    for agent in AgentName:
-        graph.add_node(agent.value, create_specialist_agent(agent))
+            latency = int((end - start)*1000)
 
-    graph.add_node("agent_consolidator", agent_consolidator)
+            logger.info(f"Specialist {nome_assunto} successfully")
 
+            self.dict_latency.update({f"agent_{agent_name.value}": latency})
 
-    graph.add_edge(START, "agent_orchestrator")
-    graph.add_conditional_edges(
-        "agent_orchestrator",
-        conditional_edge,
-        {
-            agent.value: agent.value
-            for agent in AgentName
+            return {"response_agent_spec" : [{
+                "agent_spec": agent_name.value, 
+                "answers_specialist": response.answers_specialist,
+                "kbs_selected": response.kbs_selected,
+            }], "latency": [{"agent_{agent_name.value}": latency}]}
+
+        return agent_specialist
+
+    def agent_consolidator(self, state:AgentState):
+
+        start = time.monotonic()
+        structured_llm = self.llm.with_structured_output(ResponseAgentConsolidator)
+        
+        response_agent_spec = state.response_agent_spec
+        
+        answers_specialist = [spec["answers_specialist"][0] for spec in response_agent_spec]
+        answers_specialist = "\n\n".join(answers_specialist)
+        response = structured_llm.invoke([
+            SystemMessage(content=SYSTEM_PROMPT_CONS),
+            HumanMessage(content=state.refining_question),
+            AIMessage(content=answers_specialist),
+        ])
+        logger.info("Consolidator successfully.")
+
+        end = time.monotonic()
+        latency = int((end - start)*1000)
+
+        return {
+                "answers_final": response.answers_final, 
+                "latency": [{"agent_consolidator": latency}],
+                "messages": [
+                    AIMessage(content=response.answers_final)
+                ]
         }
-    )
+    # EDGES
+    def conditional_edge(self, state: AgentState) -> list[str]:
+        """Retorna dinamicamente os agentes selecionados pelo orquestrador."""
 
-    for agent in AgentName:
-        graph.add_edge(
-            agent.value,
-            "agent_consolidator"
+        valid_agents = {agent.value for agent in AgentName}
+
+        return [
+            agent
+            for agent in state.specialist_selected
+            if agent in valid_agents
+        ]
+
+    def build_graph(self):
+
+        
+        graph = StateGraph(AgentState)
+        graph.add_node("agent_orchestrator", self.agent_orchestrator)
+
+        for agent in AgentName:
+            graph.add_node(agent.value, self.create_specialist_agent(agent))
+
+        graph.add_node("agent_consolidator", self.agent_consolidator)
+        graph.add_node("start_graph_config", self.start_graph_config)
+
+        graph.set_entry_point("start_graph_config")
+        graph.add_edge("start_graph_config", "agent_orchestrator")
+        graph.add_conditional_edges(
+            "agent_orchestrator",
+            self.conditional_edge,
+            {
+                agent.value: agent.value
+                for agent in AgentName
+            }
         )
 
-    graph.add_edge("agent_consolidator", END)
-    
-    graph = graph.compile()
+        for agent in AgentName:
+            graph.add_edge(
+                agent.value,
+                "agent_consolidator"
+            )
 
-    logger.info("Graph compiled successfully.")
+        graph.add_edge("agent_consolidator", END)
 
-    return graph
-__all__ = ["run_agents"]
+        checkpointer = InMemorySaver()
+        graph = graph.compile(checkpointer=checkpointer)
+
+        logger.info("Graph compiled successfully.")
+
+        return graph
+__all__ = ["AppAgent"]

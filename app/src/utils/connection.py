@@ -23,12 +23,14 @@ def Connection():
         raise ValueError("OPENAI_API_KEY nao foi encontrada no arquivo .credentials")
 
     model_name = os.getenv("MODEL_NAME")
+    temperature = float(os.getenv("TEMPERATURE", 0))
     if not model_name:
         raise ValueError("MODEL_NAME nao foi encontrado no arquivo .env")
 
     logger.info("Model Name Enviroment Variable: %s", model_name)
     return ChatOpenAI(
         model=model_name,
+        temperature=temperature,
         # api_key=api_key,
     )
 

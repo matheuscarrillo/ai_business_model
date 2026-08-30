@@ -7,16 +7,19 @@ from utils.routes import AgentName, AgentNameList
 
 class ResponseAgentOrch(BaseModel):
     selected_specialist: List[AgentNameList] = Field(
+        default_factory=list,
         description="Lista de especialistas selecionados pelo agente global.",
         )
 
     reasoning: List[str] = Field(
+        default_factory=list,
         description=(
         "Explicacao, na mesma posicao do especialista, sobre o motivo da selecao de cada especialista."
         ),
     )
 
     refining_question: str = Field(
+        default_factory=str,
         description="Pergunta do usuário refinada para enviar ao especialista.",
     )
 

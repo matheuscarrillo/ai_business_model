@@ -1,15 +1,32 @@
 from operator import add
-from typing import Annotated, List
+from typing import Annotated, List, Any
 from pydantic import BaseModel, Field
 from utils.routes import AgentName, AgentNameList
+from langchain_core.messages import BaseMessage
+from langgraph.graph.message import add_messages
+
+
+def append_or_reset(current: list[str], new: Any) -> list[str]:
+
+  if new == "__RESET__":
+      return []
+
+  return current + new
 
 class AgentState(BaseModel):
   question_user: str = Field(
-    default="",
+     default_factory=str,
     description="Pergunta do usuario que sera respondida pelo agente global.",
     )
+
+  messages: Annotated[List[BaseMessage], add_messages] = Field(default_factory=list)
+
+  latency: Annotated[List[dict], append_or_reset] = Field(
+     default_factory=list,
+     description="Lista de latencias de cada agente",
+  )
   
-  specialist_selected: List[AgentNameList] = Field(
+  specialist_selected: Annotated[List[AgentNameList], append_or_reset] = Field(
     default_factory=list,
     description="Lista de especialistas selecionados pelo agente global.",
   )
@@ -21,26 +38,19 @@ class AgentState(BaseModel):
     ),
   )
 
-  latency: Annotated[list[dict], add] = Field(
-    default_factory=list,
-    description=(
-      "Lista de dicionarios contendo informacoes sobre a latencia de cada agente."
-    )
-  )
-
   refining_question: str = Field(
-      default="",
+    default_factory=str,
         description="Pergunta refinada pelo agente global para o especialista.",
     )
 
-  response_agent_spec: Annotated[list[dict], add] = Field(
-      default_factory=list,
-      description=(
+  response_agent_spec: Annotated[list[dict], append_or_reset] = Field(
+    default_factory=list,
+    description=(
         "Lista de respostas dos especialistas, na mesma posicao do especialista."
       ),
     )
 
   answers_final: str = Field(
-        default="",
+    default_factory=str,
         description="Resposta final do agente parecerista, baseada nas respostas dos especialistas.",
     )
